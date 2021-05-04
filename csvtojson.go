@@ -12,6 +12,13 @@ import (
 	"strings"
 )
 
+type options struct {
+	filePath   string
+	separator  string
+	pretty     bool
+	outputPath string
+}
+
 func main() {
 	// Shows useful information when user enters --help option
 	flag.Usage = func() {
@@ -19,7 +26,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 	// Getting file data entered by user
-	fileData, err := getFileData()
+	opts, err := getOpts()
 
 	// If there is an error, gracefully exit
 	if err != nil {
@@ -27,7 +34,11 @@ func main() {
 	}
 
 	// Validating file input
-	if _, err := checkIfValidFile(fileData.filePath); err != nil {
+	if _, err := checkIfValidFile(opts.filePath); err != nil {
+		exitGracefully(err)
+	}
+
+	if err != nil {
 		exitGracefully(err)
 	}
 
@@ -37,27 +48,21 @@ func main() {
 	done := make(chan bool)
 
 	// Parsing the CSV
-	go processCsvFile(fileData, writerChannel)
+	go processCsvFile(opts, writerChannel)
 	// Writing JSON to new file
-	go writeJSONFile(fileData.filePath, writerChannel, done, fileData.pretty)
+	go writeJSONFile(opts.outputPath, writerChannel, done, opts.pretty)
 
 	// Wait for done channel to receive a value so that the function can finish
 	<-done
 }
 
-type inputFile struct {
-	filePath  string
-	separator string
-	pretty    bool
-}
-
 // Responsible for getting the terminal input data, validating, and returning the
 // struct (or error) that our program will use
-func getFileData() (inputFile, error) {
+func getOpts() (options, error) {
 
 	// Ensuring we're getting the correct # of arguments
 	if len(os.Args) < 2 {
-		return inputFile{}, errors.New("A filepath argument must be given!")
+		return options{}, errors.New("A filepath argument must be given!")
 	}
 
 	// These are out options flags.
@@ -65,6 +70,7 @@ func getFileData() (inputFile, error) {
 	// a short description that can be displayed with --help to the user
 	separator := flag.String("separator", "comma", "Column Separator")
 	pretty := flag.Bool("pretty", false, "Generate pretty JSON")
+	outputPath := flag.String("outputPath", "", "Path to save JSON output file")
 
 	// Parsing our command line arguments
 	flag.Parse()
@@ -74,12 +80,30 @@ func getFileData() (inputFile, error) {
 
 	// Validating the separator flags
 	if !(*separator == "comma" || *separator == "semicolon") {
-		return inputFile{}, errors.New("Only comma or semicolon separators allowed")
+		return options{}, errors.New("Only comma or semicolon separators allowed")
 	}
+
+	// If a path to save the output json is provided, check that the path exists and is
+	// a directory
+	if *outputPath != "" {
+		fileInfo, err := os.Stat(*outputPath)
+		if os.IsNotExist(err) {
+			return options{}, errors.New("Path provided to save output JSON does not exist")
+		} else if !fileInfo.IsDir() {
+			return options{}, errors.New("Path provided to save output JSON is not a directory")
+		}
+		// Otherwise, if not provided, default it to the input file's directory path
+	} else {
+		*outputPath = filepath.Dir(fileLocation)
+	}
+
+	// Complete the output path for saving the json data by joining the path to the output
+	// directory and the csv filename without the csv prefix
+	*outputPath = filepath.Join(*outputPath, fmt.Sprintf("%s.json", strings.TrimSuffix(filepath.Base(fileLocation), ".csv")))
 
 	// If all validations have been passed, we return the struct that gives our program
 	// all it needs to run
-	return inputFile{fileLocation, *separator, *pretty}, nil
+	return options{fileLocation, *separator, *pretty, *outputPath}, nil
 }
 
 // Responsible for ensuring the file is a csv file and/or exists
@@ -96,9 +120,9 @@ func checkIfValidFile(filename string) (bool, error) {
 	return true, nil
 }
 
-func processCsvFile(fileData inputFile, writerChannel chan<- map[string]string) {
+func processCsvFile(opts options, writerChannel chan<- map[string]string) {
 	// Open the file based on the filepath
-	file, err := os.Open(fileData.filePath)
+	file, err := os.Open(opts.filePath)
 	// Make sure there's no error, and if there is error gracefully
 	check(err)
 	// Close file when all is said and done
@@ -111,7 +135,7 @@ func processCsvFile(fileData inputFile, writerChannel chan<- map[string]string) 
 	reader := csv.NewReader(file)
 
 	// Change the default separator if the semicolon option is set
-	if fileData.separator == "semicolon" {
+	if opts.separator == "semicolon" {
 		reader.Comma = ';'
 	}
 
@@ -169,9 +193,9 @@ func processLine(headers []string, dataList []string) (map[string]string, error)
 }
 
 // Responsible for writing the JSON file
-func writeJSONFile(csvPath string, writeChannel <-chan map[string]string, done chan<- bool, pretty bool) {
+func writeJSONFile(jsonOutputPath string, writeChannel <-chan map[string]string, done chan<- bool, pretty bool) {
 	// Init a JSON writer func
-	writeString := createStringWriter(csvPath)
+	writeString := createStringWriter(jsonOutputPath)
 	// Init the JSON parse func and the breakline char
 	jsonFunc, breakLine := getJSONFunc(pretty)
 
@@ -218,16 +242,9 @@ func writeJSONFile(csvPath string, writeChannel <-chan map[string]string, done c
 // Responsible for returning a function that writes to a JSON file
 // Uses encapsulation to init a new file and returns a function scoped to the context
 // of the file initialized in the outer context
-func createStringWriter(csvPath string) func(string, bool) {
-	// Getting the directory path of where the CSV file is
-	jsonDir := filepath.Dir(csvPath)
-	// Declaring the JSON filename using the CSV filename as the base
-	jsonName := fmt.Sprintf("%s.json", strings.TrimSuffix(filepath.Base(csvPath), ".csv"))
-	// Declare the JSON file location
-	finalLocation := filepath.Join(jsonDir, jsonName)
-
+func createStringWriter(jsonOutputPath string) func(string, bool) {
 	// Open the JSON file we will start writing to
-	f, err := os.Create(finalLocation)
+	f, err := os.Create(jsonOutputPath)
 	// Check for err, gracefully error
 	check(err)
 

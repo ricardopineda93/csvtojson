@@ -8,21 +8,21 @@ import (
 	"testing"
 )
 
-func Test_getFileData(t *testing.T) {
+func Test_getOpts(t *testing.T) {
 	// Defining test slice -- each unit test should have the follow properties:
 	tests := []struct {
-		name    string    // name of the test
-		want    inputFile // what inputFile instance our function should return
-		wantErr bool      // whether we want an error
-		osArgs  []string  // The command args used for this test
+		name    string   // name of the test
+		want    options  // what options instance our function should return
+		wantErr bool     // whether we want an error
+		osArgs  []string // The command args used for this test
 	}{
 		// Here we're declaring each unit test input and output data as defined above
-		{"Default parameters", inputFile{"test.csv", "comma", false}, false, []string{"cmd", "test.csv"}},
-		{"No parameters", inputFile{}, true, []string{"cmd"}},
-		{"Semicolon enabled", inputFile{"test.csv", "semicolon", false}, false, []string{"cmd", "--separator=semicolon", "test.csv"}},
-		{"Pretty enabled", inputFile{"test.csv", "comma", true}, false, []string{"cmd", "--pretty", "test.csv"}},
-		{"Pretty and semicolon enabled", inputFile{"test.csv", "semicolon", true}, false, []string{"cmd", "--pretty", "--separator=semicolon", "test.csv"}},
-		{"Separator not identified", inputFile{}, true, []string{"cmd", "--separator=pipe", "test.csv"}},
+		{"Default parameters", options{"test.csv", "comma", false, ""}, false, []string{"cmd", "test.csv"}},
+		{"No parameters", options{}, true, []string{"cmd"}},
+		{"Semicolon enabled", options{"test.csv", "semicolon", false, ""}, false, []string{"cmd", "--separator=semicolon", "test.csv"}},
+		{"Pretty enabled", options{"test.csv", "comma", true, ""}, false, []string{"cmd", "--pretty", "test.csv"}},
+		{"Pretty and semicolon enabled", options{"test.csv", "semicolon", true, ""}, false, []string{"cmd", "--pretty", "--separator=semicolon", "test.csv"}},
+		{"Separator not identified", options{}, true, []string{"cmd", "--separator=pipe", "test.csv"}},
 	}
 
 	// Iterate over our test slice
@@ -42,16 +42,16 @@ func Test_getFileData(t *testing.T) {
 			os.Args = tt.osArgs
 
 			// Running the function we wish to test
-			got, err := getFileData()
+			got, err := getOpts()
 
 			// An assertion of whether or not we want to get an error value
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getFileData() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getOpts() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			// Asserting we are getting the corrent "want" value
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getFileData() = %v, want %v", got, tt.want)
+				t.Errorf("getOpts() = %v, want %v", got, tt.want)
 			}
 
 		})
