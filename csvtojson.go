@@ -255,6 +255,7 @@ func getJSONFunc(pretty bool) (func(map[string]string) string, string) {
 
 	// If pretty is enabled, we should format the JSON with line breaks and indentation
 	if pretty {
+		// The linebreak char will be a newline
 		breakLine = "\n"
 		jsonFunc = func(record map[string]string) string {
 			jsonData, _ := json.MarshalIndent(record, "   ", "   ")
