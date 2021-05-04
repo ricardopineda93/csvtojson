@@ -230,7 +230,7 @@ func writeJSONFile(jsonOutputPath string, writeChannel <-chan map[string]string,
 			// Writing the last char to the file and close it
 			writeString(breakLine+"]", true)
 			// Print that we are done to terminal
-			fmt.Println("Done!")
+			fmt.Printf("Done!\nOutput JSON written to: %s", jsonOutputPath)
 			// Send "done" signal to main func to let it know it can start exiting
 			done <- true
 			// Break out of the loop
